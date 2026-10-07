@@ -1,9 +1,27 @@
 const STORE = "hra20-checks";
 const TEAMS = ["1조", "2조", "3조"];
 
+// 공유 저장소(Google Apps Script 웹 앱 URL). 비어 있으면 이 브라우저에만 저장한다.
+const API = "";
+
 let checks = {};
 try { checks = JSON.parse(localStorage.getItem(STORE)) || {}; } catch {}
-const save = () => { try { localStorage.setItem(STORE, JSON.stringify(checks)); } catch {} };
+const saveLocal = () => { try { localStorage.setItem(STORE, JSON.stringify(checks)); } catch {} };
+const save = (key, on) => {
+  saveLocal();
+  if (!API) return;
+  // text/plain이면 CORS 사전 요청 없이 보낼 수 있다
+  fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ key, on }) })
+    .catch(() => alert("저장 실패: 인터넷 연결을 확인하세요."));
+};
+async function load() {
+  if (!API) return;
+  try {
+    checks = await (await fetch(API)).json();
+    saveLocal();
+    render();
+  } catch {}
+}
 
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const addDays = (s, n) => { const d = new Date(s + "T00:00"); d.setDate(d.getDate() + n); return ymd(d); };
@@ -86,7 +104,7 @@ function render() {
         cb.checked = !!checks[it.key];
         cb.onchange = () => {
           if (cb.checked) checks[it.key] = 1; else delete checks[it.key];
-          save();
+          save(it.key, cb.checked);
           box.classList.toggle("done", g.items.every((i) => checks[i.key]));
         };
         lab.append(cb, it.label);
@@ -101,3 +119,5 @@ function render() {
 $("prev").onclick = () => { cur.setMonth(cur.getMonth() - 1); render(); };
 $("next").onclick = () => { cur.setMonth(cur.getMonth() + 1); render(); };
 render();
+load();
+setInterval(load, 60000); // 다른 사람이 체크한 내용 1분마다 반영
