@@ -65,9 +65,14 @@ function render() {
     for (const g of due[day] || []) {
       const box = document.createElement("div");
       box.className = `group ${g.kind}`;
-      const done = g.items.every((i) => checks[i.key]);
+      const done = !window.VIEW_ONLY && g.items.every((i) => checks[i.key]);
       if (done) box.classList.add("done");
       box.innerHTML = `<div class="gt">${g.title}</div>`;
+      if (window.VIEW_ONLY) {
+        if (g.kind === "classic") box.insertAdjacentHTML("beforeend", `<div class="who">${g.items.map((i) => i.label).join(" · ")}</div>`);
+        cell.append(box);
+        continue;
+      }
       for (const it of g.items) {
         const lab = document.createElement("label");
         const cb = document.createElement("input");

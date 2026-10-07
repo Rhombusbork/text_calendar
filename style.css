@@ -28,6 +28,7 @@ header button:disabled { opacity: .3; cursor: default; }
 .group.biz { border-color: var(--biz); }
 .group.done { border-color: var(--done); color: var(--muted); }
 .gt { font-weight: 600; }
+.who { color: var(--muted); }
 .group label { display: inline-flex; align-items: center; gap: 3px; margin-right: 10px; white-space: nowrap; cursor: pointer; }
 
 @media (max-width: 700px) {
