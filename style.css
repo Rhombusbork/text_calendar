@@ -23,6 +23,7 @@ header button:disabled { opacity: .3; cursor: default; }
 .num { font-weight: 600; }
 .class { font-size: 11px; color: var(--muted); word-break: keep-all; overflow-wrap: anywhere; }
 .class div { margin-top: 3px; }
+.move { margin-top: 4px; font-size: 10px; padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; background: none; color: var(--muted); cursor: pointer; }
 
 .group { border-left: 3px solid var(--classic); padding: 2px 6px; margin-top: 4px; }
 .group.book { border-color: var(--book); }

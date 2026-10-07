@@ -5,20 +5,22 @@ const TEAMS = ["1조", "2조", "3조"];
 const API = "https://script.google.com/macros/s/AKfycby9oyl_hayFbKHbmMA8Ewv_491G8Ke-6MDLIdXLs9vKRQ_A2kvh33mw6C59Xv5l4LpEBw/exec";
 
 let checks = {};
+let moves = {}; // 원래 수업일 → 바뀐 수업일
 try { checks = JSON.parse(localStorage.getItem(STORE)) || {}; } catch {}
 const saveLocal = () => { try { localStorage.setItem(STORE, JSON.stringify(checks)); } catch {} };
-const save = (key, on) => {
-  saveLocal();
-  if (!API) return;
-  // text/plain이면 CORS 사전 요청 없이 보낼 수 있다
-  fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ key, on }) })
-    .catch(() => alert("저장 실패: 인터넷 연결을 확인하세요."));
-};
+// text/plain이면 CORS 사전 요청 없이 보낼 수 있다
+const post = (body) => API && fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(body) })
+  .catch(() => alert("저장 실패: 인터넷 연결을 확인하세요."));
+const save = (key, on) => { saveLocal(); post({ key, on }); };
 async function load() {
   if (!API) return;
   try {
-    checks = await (await fetch(API)).json();
+    const data = await (await fetch(API)).json();
+    if ("checks" in data) { checks = data.checks; moves = data.moves || {}; }
+    else checks = data; // 날짜 변경 기능 이전 Apps Script 응답
+
     saveLocal();
+    build();
     render();
   } catch {}
 }
@@ -26,27 +28,44 @@ async function load() {
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const addDays = (s, n) => { const d = new Date(s + "T00:00"); d.setDate(d.getDate() + n); return ymd(d); };
 
-// 제출일(월요일) → 제출 그룹 목록
-const due = {};
-const push = (day, g) => (due[day] ||= []).push(g);
-for (const c of CLASSES) {
-  for (const [round, offset] of [["1차", -12], ["2차", -5]]) {
-    for (const b of c.classics) {
-      const items = b.people
-        ? b.people.map(([name, role]) => ({ label: `${name}(${role})`, key: `${c.date}|${round}|${b.title}|${name}` }))
-        : [{ label: "제출", key: `${c.date}|${round}|${b.title}` }];
-      push(addDays(c.date, offset), { kind: "classic", title: `고전 ${round} · ${b.title}`, items });
+// 제출일(월요일) → 제출 그룹 목록. 체크 키는 원래 수업일 기준이라 날짜를 바꿔도 체크가 유지된다.
+let due = {}, classOn = {};
+function build() {
+  due = {}; classOn = {};
+  const push = (day, g) => (due[day] ||= []).push(g);
+  for (const c of CLASSES) {
+    const day = moves[c.date] || c.date;
+    classOn[day] = c;
+    for (const [round, offset] of [["1차", -12], ["2차", -5]]) {
+      for (const b of c.classics) {
+        const items = b.people
+          ? b.people.map(([name, role]) => ({ label: `${name}(${role})`, key: `${c.date}|${round}|${b.title}|${name}` }))
+          : [{ label: "제출", key: `${c.date}|${round}|${b.title}` }];
+        push(addDays(day, offset), { kind: "classic", title: `고전 ${round} · ${b.title}`, items });
+      }
+    }
+    for (const [kind, name, title] of [["book", "경영서", c.book], ["biz", "기업실무", c.biz]]) {
+      if (!title) continue;
+      push(addDays(day, -5), {
+        kind, title: `${name} · ${title}`,
+        items: TEAMS.map((t) => ({ label: t, key: `${c.date}|${name}|${t}` })),
+      });
     }
   }
-  for (const [kind, name, title] of [["book", "경영서", c.book], ["biz", "기업실무", c.biz]]) {
-    if (!title) continue;
-    push(addDays(c.date, -5), {
-      kind, title: `${name} · ${title}`,
-      items: TEAMS.map((t) => ({ label: t, key: `${c.date}|${name}|${t}` })),
-    });
-  }
 }
-const classOn = Object.fromEntries(CLASSES.map((c) => [c.date, c]));
+build();
+
+function moveClass(c) {
+  const now = moves[c.date] || c.date;
+  const input = prompt(`새 수업 날짜를 입력하세요 (예: ${now}).\n비워 두면 원래 날짜(${c.date})로 돌아갑니다.`, now);
+  if (input === null) return;
+  const to = input.trim() || c.date;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(to) || isNaN(new Date(to + "T00:00"))) return alert("YYYY-MM-DD 형식으로 입력하세요.");
+  if (to === c.date) delete moves[c.date]; else moves[c.date] = to;
+  post({ move: c.date, to: to === c.date ? "" : to });
+  build();
+  render();
+}
 
 const today = ymd(new Date());
 const first = new Date(CLASSES[0].date.slice(0, 7) + "-01T00:00");
@@ -83,7 +102,15 @@ function render() {
       const lines = [`고전: ${c.classics.map((b) => b.title).join(", ")}`];
       if (c.book) lines.push(`경영서: ${c.book}`);
       if (c.biz) lines.push(`기업실무: ${c.biz}`);
+      if (moves[c.date]) lines.push(`(원래 ${c.date.slice(5).replace("-", "/")})`);
       cell.insertAdjacentHTML("beforeend", `<div class="class">${lines.map((l) => `<div>${l}</div>`).join("")}</div>`);
+      if (!window.VIEW_ONLY) {
+        const btn = document.createElement("button");
+        btn.className = "move";
+        btn.textContent = "날짜 변경";
+        btn.onclick = () => moveClass(c);
+        cell.append(btn);
+      }
     }
 
     for (const g of due[day] || []) {
