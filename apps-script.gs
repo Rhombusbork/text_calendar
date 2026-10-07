@@ -1,6 +1,6 @@
 // Google 스프레드시트 > 확장 프로그램 > Apps Script 에 붙여넣고 웹 앱으로 배포한다.
 // 시트 "checks": A열에 체크된 항목 키를 한 줄씩 저장한다.
-// 시트 "moves": A열 원래 수업일, B열 바뀐 수업일.
+// 시트 "moves": A열 대상(원래 수업일 / 제출 묶음 id / 항목 키), B열 바뀐 날짜.
 function sheet_(name) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   return ss.getSheetByName(name) || ss.insertSheet(name);

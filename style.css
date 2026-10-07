@@ -33,7 +33,7 @@ header button:disabled { opacity: .3; cursor: default; }
 .orig { font-weight: normal; color: var(--muted); }
 .gt .move { margin-top: 0; }
 .who { color: var(--muted); }
-.group label { display: inline-flex; align-items: center; gap: 3px; margin-right: 10px; white-space: nowrap; cursor: pointer; }
+.group label { display: inline-flex; align-items: center; gap: 3px; margin-right: 2px; white-space: nowrap; cursor: pointer; }
 
 @media (max-width: 700px) {
   body { padding: 8px; font-size: 12px; }

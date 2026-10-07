@@ -33,9 +33,13 @@ let due = {}, classOn = {};
 function build() {
   due = {}; classOn = {};
   // 제출일은 수업일 기준으로 계산하되, 따로 바꾼 날짜(moves[id])가 있으면 그것을 쓴다
+  // 사람(항목)별로 바꾼 날짜(moves[item.key])가 가장 우선이고, 날짜가 같은 항목끼리 묶어서 보여준다.
   const group = (id, auto, g) => {
-    const day = moves[id] || auto;
-    (due[day] ||= []).push({ ...g, id, auto, moved: !!moves[id] });
+    const byDay = {};
+    for (const it of g.items) (byDay[moves[it.key] || moves[id] || auto] ||= []).push(it);
+    for (const [day, items] of Object.entries(byDay)) {
+      (due[day] ||= []).push({ ...g, items, id, auto, base: moves[id] || auto, moved: day !== auto });
+    }
   };
   for (const c of CLASSES) {
     const day = moves[c.date] || c.date;
@@ -148,8 +152,13 @@ function render() {
           save(it.key, cb.checked);
           box.classList.toggle("done", g.items.every((i) => checks[i.key]));
         };
+        const mv = document.createElement("button");
+        mv.className = "move";
+        mv.textContent = "↔";
+        mv.title = `${it.label}만 제출 날짜 변경`;
+        mv.onclick = () => moveDate(it.key, g.base, `${g.title} - ${it.label}`);
         lab.append(cb, it.label);
-        box.append(lab);
+        box.append(lab, mv, " ");
       }
       cell.append(box);
     }
