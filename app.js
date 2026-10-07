@@ -32,7 +32,11 @@ const addDays = (s, n) => { const d = new Date(s + "T00:00"); d.setDate(d.getDat
 let due = {}, classOn = {};
 function build() {
   due = {}; classOn = {};
-  const push = (day, g) => (due[day] ||= []).push(g);
+  // 제출일은 수업일 기준으로 계산하되, 따로 바꾼 날짜(moves[id])가 있으면 그것을 쓴다
+  const group = (id, auto, g) => {
+    const day = moves[id] || auto;
+    (due[day] ||= []).push({ ...g, id, auto, moved: !!moves[id] });
+  };
   for (const c of CLASSES) {
     const day = moves[c.date] || c.date;
     classOn[day] = c;
@@ -41,12 +45,12 @@ function build() {
         const items = b.people
           ? b.people.map(([name, role]) => ({ label: `${name}(${role})`, key: `${c.date}|${round}|${b.title}|${name}` }))
           : [{ label: "제출", key: `${c.date}|${round}|${b.title}` }];
-        push(addDays(day, offset), { kind: "classic", title: `고전 ${round} · ${b.title}`, items });
+        group(`${c.date}|${round}|${b.title}`, addDays(day, offset), { kind: "classic", title: `고전 ${round} · ${b.title}`, items });
       }
     }
     for (const [kind, name, title] of [["book", "경영서", c.book], ["biz", "기업실무", c.biz]]) {
       if (!title) continue;
-      push(addDays(day, -5), {
+      group(`${c.date}|${name}`, addDays(day, -5), {
         kind, title: `${name} · ${title}`,
         items: TEAMS.map((t) => ({ label: t, key: `${c.date}|${name}|${t}` })),
       });
@@ -55,17 +59,19 @@ function build() {
 }
 build();
 
-function moveClass(c) {
-  const now = moves[c.date] || c.date;
-  const input = prompt(`새 수업 날짜를 입력하세요 (예: ${now}).\n비워 두면 원래 날짜(${c.date})로 돌아갑니다.`, now);
+// id: 수업이면 원래 수업일, 제출이면 제출 그룹 id. base: 바꾸기 전 기본 날짜.
+function moveDate(id, base, what) {
+  const now = moves[id] || base;
+  const input = prompt(`${what} 날짜를 입력하세요 (예: ${now}).\n비워 두면 기본 날짜(${base})로 돌아갑니다.`, now);
   if (input === null) return;
-  const to = input.trim() || c.date;
+  const to = input.trim() || base;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(to) || isNaN(new Date(to + "T00:00"))) return alert("YYYY-MM-DD 형식으로 입력하세요.");
-  if (to === c.date) delete moves[c.date]; else moves[c.date] = to;
-  post({ move: c.date, to: to === c.date ? "" : to });
+  if (to === base) delete moves[id]; else moves[id] = to;
+  post({ move: id, to: to === base ? "" : to });
   build();
   render();
 }
+const md = (s) => s.slice(5).replace("-", "/");
 
 const today = ymd(new Date());
 const first = new Date(CLASSES[0].date.slice(0, 7) + "-01T00:00");
@@ -102,13 +108,13 @@ function render() {
       const lines = [`고전: ${c.classics.map((b) => b.title).join(", ")}`];
       if (c.book) lines.push(`경영서: ${c.book}`);
       if (c.biz) lines.push(`기업실무: ${c.biz}`);
-      if (moves[c.date]) lines.push(`(원래 ${c.date.slice(5).replace("-", "/")})`);
+      if (moves[c.date]) lines.push(`(원래 ${md(c.date)})`);
       cell.insertAdjacentHTML("beforeend", `<div class="class">${lines.map((l) => `<div>${l}</div>`).join("")}</div>`);
       if (!window.VIEW_ONLY) {
         const btn = document.createElement("button");
         btn.className = "move";
         btn.textContent = "날짜 변경";
-        btn.onclick = () => moveClass(c);
+        btn.onclick = () => moveDate(c.date, c.date, "새 수업");
         cell.append(btn);
       }
     }
@@ -118,7 +124,15 @@ function render() {
       box.className = `group ${g.kind}`;
       const done = !window.VIEW_ONLY && g.items.every((i) => checks[i.key]);
       if (done) box.classList.add("done");
-      box.innerHTML = `<div class="gt">${g.title}</div>`;
+      box.innerHTML = `<div class="gt">${g.title}${g.moved ? ` <span class="orig">(원래 ${md(g.auto)})</span>` : ""}</div>`;
+      if (!window.VIEW_ONLY) {
+        const btn = document.createElement("button");
+        btn.className = "move";
+        btn.textContent = "날짜";
+        btn.title = "이 제출 날짜만 변경";
+        btn.onclick = () => moveDate(g.id, g.auto, `'${g.title}' 제출`);
+        box.firstChild.append(" ", btn);
+      }
       if (window.VIEW_ONLY) {
         if (g.kind === "classic") box.insertAdjacentHTML("beforeend", `<div class="who">${g.items.map((i) => i.label).join(" · ")}</div>`);
         cell.append(box);
