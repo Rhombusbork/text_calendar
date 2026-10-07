@@ -2,7 +2,7 @@ const STORE = "hra20-checks";
 const TEAMS = ["1조", "2조", "3조"];
 
 // 공유 저장소(Google Apps Script 웹 앱 URL). 비어 있으면 이 브라우저에만 저장한다.
-const API = "";
+const API = "https://script.google.com/macros/s/AKfycby9oyl_hayFbKHbmMA8Ewv_491G8Ke-6MDLIdXLs9vKRQ_A2kvh33mw6C59Xv5l4LpEBw/exec";
 
 let checks = {};
 try { checks = JSON.parse(localStorage.getItem(STORE)) || {}; } catch {}
