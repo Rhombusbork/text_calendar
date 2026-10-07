@@ -60,7 +60,13 @@ function render() {
     if (day === today) cell.classList.add("today");
     cell.innerHTML = `<div class="num">${d.getDate()}</div>`;
 
-    if (classOn[day]) cell.insertAdjacentHTML("beforeend", `<div class="class">수업</div>`);
+    const c = classOn[day];
+    if (c) {
+      const lines = [`고전: ${c.classics.map((b) => b.title).join(", ")}`];
+      if (c.book) lines.push(`경영서: ${c.book}`);
+      if (c.biz) lines.push(`기업실무: ${c.biz}`);
+      cell.insertAdjacentHTML("beforeend", `<div class="class">${lines.map((l) => `<div>${l}</div>`).join("")}</div>`);
+    }
 
     for (const g of due[day] || []) {
       const box = document.createElement("div");
