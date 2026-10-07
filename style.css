@@ -1,0 +1,37 @@
+:root {
+  --bg: #fff; --fg: #222; --muted: #999; --line: #e3e3e3; --today: #fff7d6;
+  --classic: #2f6fdb; --book: #1d9a6c; --biz: #d9822b; --done: #bbb;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #17181a; --fg: #e6e6e6; --muted: #777; --line: #2c2e31; --today: #2d2a1c; --done: #555; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 12px; font: 13px/1.4 -apple-system, "Pretendard", "Malgun Gothic", sans-serif; background: var(--bg); color: var(--fg); }
+
+header { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 10px; }
+h1 { font-size: 18px; margin: 0; min-width: 120px; text-align: center; }
+header button { font-size: 20px; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: none; color: inherit; cursor: pointer; }
+header button:disabled { opacity: .3; cursor: default; }
+
+/* 제출이 몰리는 월요일 칸을 넓게 */
+#grid { display: grid; grid-template-columns: 4fr repeat(6, minmax(0, 1fr)); border-left: 1px solid var(--line); border-top: 1px solid var(--line); }
+.dow, .cell { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.dow { padding: 4px; text-align: center; font-weight: 600; }
+.cell { min-height: 72px; padding: 4px; min-width: 0; }
+.cell.out { opacity: .4; }
+.cell.today { background: var(--today); }
+.num { font-weight: 600; }
+.class { font-size: 11px; color: var(--muted); }
+
+.group { border-left: 3px solid var(--classic); padding: 2px 6px; margin-top: 4px; }
+.group.book { border-color: var(--book); }
+.group.biz { border-color: var(--biz); }
+.group.done { border-color: var(--done); color: var(--muted); }
+.gt { font-weight: 600; }
+.group label { display: inline-flex; align-items: center; gap: 3px; margin-right: 10px; white-space: nowrap; cursor: pointer; }
+
+@media (max-width: 700px) {
+  body { padding: 8px; font-size: 12px; }
+  #grid { grid-template-columns: 6fr repeat(6, minmax(0, 1fr)); }
+  .class { display: none; }
+}
