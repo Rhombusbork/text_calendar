@@ -21,7 +21,7 @@ async function load() {
 
     saveLocal();
     build();
-    render();
+    if (!document.body.classList.contains("dragging")) render(); // 끄는 중이면 놓을 때 다시 그린다
   } catch {}
 }
 
@@ -63,15 +63,12 @@ function build() {
 }
 build();
 
-// id: 수업이면 원래 수업일, 제출이면 제출 그룹 id. base: 바꾸기 전 기본 날짜.
-function moveDate(id, base, what) {
-  const now = moves[id] || base;
-  const input = prompt(`${what} 날짜를 입력하세요 (예: ${now}).\n비워 두면 기본 날짜(${base})로 돌아갑니다.`, now);
-  if (input === null) return;
-  const to = input.trim() || base;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(to) || isNaN(new Date(to + "T00:00"))) return alert("YYYY-MM-DD 형식으로 입력하세요.");
-  if (to === base) delete moves[id]; else moves[id] = to;
-  post({ move: id, to: to === base ? "" : to });
+// changes: [[id, 바뀐 날짜 | null(기본 날짜로)]]. id는 원래 수업일 / 제출 묶음 id / 항목 키.
+function setMoves(changes) {
+  for (const [id, to] of changes) {
+    if (to) moves[id] = to; else delete moves[id];
+    post({ move: id, to: to || "" });
+  }
   build();
   render();
 }
@@ -86,6 +83,24 @@ if (cur < first) cur = new Date(first);
 if (cur > last) cur = new Date(last);
 
 const $ = (id) => document.getElementById(id);
+
+// 끌어서 옮길 수 있는 요소에 정보를 달아 둔다. 실제 드래그는 drag.js가 처리한다.
+// info: { key, kind, title, from(지금 날짜), base(기본 날짜), ids(바꿀 moves 키들) }
+const GRIP = `<svg viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor">${[4, 8, 12].map((y) =>
+  `<circle cx="6" cy="${y}" r="1.4"/><circle cx="10" cy="${y}" r="1.4"/>`).join("")}</g></svg>`;
+// gripIn: 손잡이(누르면 날짜 선택, 방향키로 이동)를 넣을 요소
+function draggable(el, info, gripIn) {
+  el.dataset.dragId = info.key;
+  el.drag = info;
+  if (!gripIn) return;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "grip";
+  b.innerHTML = GRIP;
+  b.title = "끌어서 날짜 옮기기 · 누르면 날짜 선택";
+  b.setAttribute("aria-label", `${info.title} 날짜 옮기기. 방향키로 이동, Enter로 확정`);
+  gripIn.prepend(b);
+}
 
 function render() {
   $("title").textContent = `${cur.getFullYear()}년 ${cur.getMonth() + 1}월`;
@@ -103,6 +118,7 @@ function render() {
     const day = ymd(d);
     const cell = document.createElement("div");
     cell.className = "cell";
+    cell.dataset.day = day;
     if (d.getMonth() !== cur.getMonth()) cell.classList.add("out");
     if (day === today) cell.classList.add("today");
     cell.innerHTML = `<div class="num">${d.getDate()}</div>`;
@@ -113,14 +129,11 @@ function render() {
       if (c.book) lines.push(`경영서: ${c.book}`);
       if (c.biz) lines.push(`기업실무: ${c.biz}`);
       if (moves[c.date]) lines.push(`(원래 ${md(c.date)})`);
-      cell.insertAdjacentHTML("beforeend", `<div class="class">${lines.map((l) => `<div>${l}</div>`).join("")}</div>`);
-      if (!window.VIEW_ONLY) {
-        const btn = document.createElement("button");
-        btn.className = "move";
-        btn.textContent = "날짜 변경";
-        btn.onclick = () => moveDate(c.date, c.date, "새 수업");
-        cell.append(btn);
-      }
+      const cl = document.createElement("div");
+      cl.className = "class";
+      cl.innerHTML = lines.map((l) => `<div>${l}</div>`).join("");
+      if (!window.VIEW_ONLY) draggable(cl, { key: c.date, kind: "class", title: `수업 · ${c.classics.map((b) => b.title).join(", ")}`, from: day, base: c.date, ids: [c.date] }, cl);
+      cell.append(cl);
     }
 
     for (const g of due[day] || []) {
@@ -130,12 +143,12 @@ function render() {
       if (done) box.classList.add("done");
       box.innerHTML = `<div class="gt">${g.title}${g.moved ? ` <span class="orig">(원래 ${md(g.auto)})</span>` : ""}</div>`;
       if (!window.VIEW_ONLY) {
-        const btn = document.createElement("button");
-        btn.className = "move";
-        btn.textContent = "날짜";
-        btn.title = "이 제출 날짜만 변경";
-        btn.onclick = () => moveDate(g.id, g.auto, `'${g.title}' 제출`);
-        box.firstChild.append(" ", btn);
+        // 묶음 날짜에 있는 상자는 묶음째로, 따로 옮겨 둔 항목끼리 모인 상자는 그 항목들만 옮긴다
+        const main = day === g.base;
+        draggable(box, main
+          ? { key: g.id, kind: g.kind, title: g.title, from: day, base: g.auto, ids: [g.id] }
+          : { key: g.id, kind: g.kind, title: `${g.title} (${g.items.map((i) => i.label).join(", ")})`, from: day, base: g.base, ids: g.items.map((i) => i.key) },
+        box.firstChild);
       }
       if (window.VIEW_ONLY) {
         if (g.kind === "classic") box.insertAdjacentHTML("beforeend", `<div class="who">${g.items.map((i) => i.label).join(" · ")}</div>`);
@@ -152,13 +165,9 @@ function render() {
           save(it.key, cb.checked);
           box.classList.toggle("done", g.items.every((i) => checks[i.key]));
         };
-        const mv = document.createElement("button");
-        mv.className = "move";
-        mv.textContent = "↔";
-        mv.title = `${it.label}만 제출 날짜 변경`;
-        mv.onclick = () => moveDate(it.key, g.base, `${g.title} - ${it.label}`);
         lab.append(cb, it.label);
-        box.append(lab, mv, " ");
+        if (g.items.length > 1) draggable(lab, { key: it.key, kind: g.kind, title: `${it.label} · ${g.title}`, from: day, base: g.base, ids: [it.key] });
+        box.append(lab, " ");
       }
       cell.append(box);
     }
